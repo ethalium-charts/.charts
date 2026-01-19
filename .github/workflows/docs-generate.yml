@@ -20,8 +20,8 @@ permissions:
 ## Concurrency settings
 ##
 concurrency:
-  group: generate-readme-${{ github.repository }}
-  cancel-in-progress: true
+  group: ${{ github.repository }}
+  cancel-in-progress: false
 
 ## Jobs
 ##

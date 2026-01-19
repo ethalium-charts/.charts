@@ -19,8 +19,8 @@ permissions:
 ## Concurrency settings
 ##
 concurrency:
-  group: publish-index-${{ github.repository }}
-  cancel-in-progress: true
+  group: ${{ github.repository }}
+  cancel-in-progress: false
 
 ## Jobs
 ##
@@ -51,7 +51,7 @@ jobs:
           set -euo pipefail
           git config user.name  "EthaliumCharts Bot"
           git config user.email "ethalium-charts-bot@users.noreply.github.com"
-          
+
           git fetch origin main
           git pull --rebase origin main
 

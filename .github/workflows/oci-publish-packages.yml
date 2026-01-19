@@ -18,8 +18,8 @@ permissions:
 ## Concurrency settings
 ##
 concurrency:
-  group: publish-oci-${{ github.repository }}
-  cancel-in-progress: true
+  group: ${{ github.repository }}
+  cancel-in-progress: false
 
 ## Jobs
 ##
