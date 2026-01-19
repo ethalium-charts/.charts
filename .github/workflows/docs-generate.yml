@@ -52,6 +52,9 @@ jobs:
           set -euo pipefail
           git config user.name  "EthaliumCharts Bot"
           git config user.email "ethalium-charts-bot@users.noreply.github.com"
+          
+          git fetch origin main
+          git pull --rebase origin main
 
       ## Generate README.md
       - name: Generate README.md table (latest version per chart)
@@ -193,9 +196,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
-          git fetch origin main
-          git pull --rebase origin main
+          
           git add README.md
 
           if git diff --cached --quiet; then
