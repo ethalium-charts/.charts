@@ -77,6 +77,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          git fetch origin main
+          git pull --rebase origin main
           git add index.yaml
 
           if git diff --cached --quiet; then
