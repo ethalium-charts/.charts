@@ -58,7 +58,6 @@ jobs:
         run: |
           set -euo pipefail
           INDEX="index.yaml"
-          rm -f $INDEX
 
           for chart_dir in "$REPO_PACKAGES"/*/; do
             [ -d "$chart_dir" ] || continue
