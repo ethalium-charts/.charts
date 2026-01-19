@@ -14,5 +14,4 @@ helm install <releaseName> ethalium/<chart> --version <version>
 | Chart | Version&nbsp;(Stable) | Description |
 |:------|:-----------------|:------------|
 | [`common`](https://github.com/ethalium-charts/common) | `1.0.0` | Shared functions/templates for helm charts |  |
-| [`test`](https://github.com/ethalium-charts/test) | `1.0.0` | Shared functions/templates for helm charts |  |
 <!-- CHARTS:END -->
