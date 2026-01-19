@@ -1,0 +1,204 @@
+## Defines the name of the workflow
+##
+name: "[DOCS] generate documentation"
+
+## Defines when the workflow should be started
+##
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/docs-generate.yml"
+      - "packages/**"
+      - "README.tpl"
+
+## Defines the permissions of the workflow
+##
+permissions:
+  contents: write
+
+## Concurrency settings
+##
+concurrency:
+  group: generate-readme-${{ github.repository }}
+  cancel-in-progress: true
+
+## Jobs
+##
+jobs:
+  generate-readme:
+    runs-on: ubuntu-latest
+    env:
+      REPO_URL: "https://charts.ethalium.eu"
+      REPO_PACKAGES: "packages"
+    steps:
+
+      ## Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      ## Install helm
+      - name: Install helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.4
+
+      ## Configure git identity
+      - name: Configure git identity for charts repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name  "EthaliumCharts Bot"
+          git config user.email "ethalium-charts-bot@users.noreply.github.com"
+
+      ## Generate README.md
+      - name: Generate README.md table (latest version per chart)
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          # declare files and pointers
+          README="README.md"
+          START="<!-- CHARTS:START -->"
+          END="<!-- CHARTS:END -->"
+
+          # copy readme template
+          rm -f "${README}"
+          cp "README.tpl" "${README}"
+
+          # version compare helper (SemVer-ish)
+          ver_gt() {
+            # returns 0 if $1 > $2
+            [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -n 1)" = "$1" ] && [ "$1" != "$2" ]
+          }
+
+          # store best package per chart name
+          declare -A best_pkg best_ver best_desc best_src best_is_prerelease
+
+          pkgs=("${REPO_PACKAGES}"/**/*.tgz)
+          for pkg in "${pkgs[@]}"; do
+            chart_yaml="$(helm show chart "$pkg")"
+
+            name="$(printf "%s\n" "$chart_yaml" | awk -F': *' '$1=="name"{print $2; exit}' | tr -d '"' | tr -d "'")"
+            version="$(printf "%s\n" "$chart_yaml" | awk -F': *' '$1=="version"{print $2; exit}' | tr -d '"' | tr -d "'")"
+            desc="$(printf "%s\n" "$chart_yaml" | awk -F': *' '
+              $1=="description"{
+                sub(/^description:[[:space:]]*/,"");
+                print; exit
+              }' )"
+
+            src="$(printf "%s\n" "$chart_yaml" | awk '
+              $1=="sources:" {getline; sub(/^[[:space:]]*-[[:space:]]*/,""); print; exit}
+            ')"
+            if [ -z "$src" ]; then
+              src="$(printf "%s\n" "$chart_yaml" | awk -F': *' '$1=="home"{print $2; exit}' | tr -d '"' | tr -d "'")"
+            fi
+
+            # fallbacks
+            [ -z "$name" ] && name="$(basename "$pkg" | sed -E 's/-[0-9].*\.tgz$//')"
+            [ -z "$version" ] && version="$(basename "$pkg" | sed -E 's/^.*-([0-9].*)\.tgz$/\1/')"
+            [ -z "$desc" ] && desc=""
+
+            # prerelease? (contains '-')
+            is_pre=0
+            if [[ "$version" == *-* ]]; then is_pre=1; fi
+
+            if [ -z "${best_ver[$name]+x}" ]; then
+              best_pkg["$name"]="$pkg"
+              best_ver["$name"]="$version"
+              best_desc["$name"]="$desc"
+              best_src["$name"]="$src"
+              best_is_prerelease["$name"]="$is_pre"
+              continue
+            fi
+
+            cur_ver="${best_ver[$name]}"
+            cur_is_pre="${best_is_prerelease[$name]}"
+
+            # prefer stable over prerelease
+            if [ "$cur_is_pre" -eq 1 ] && [ "$is_pre" -eq 0 ]; then
+              best_pkg["$name"]="$pkg"
+              best_ver["$name"]="$version"
+              best_desc["$name"]="$desc"
+              best_src["$name"]="$src"
+              best_is_prerelease["$name"]="$is_pre"
+              continue
+            fi
+
+            # if both stable or both prerelease: pick higher version
+            if [ "$cur_is_pre" -eq "$is_pre" ]; then
+              if ver_gt "$version" "$cur_ver"; then
+                best_pkg["$name"]="$pkg"
+                best_ver["$name"]="$version"
+                best_desc["$name"]="$desc"
+                best_src["$name"]="$src"
+                best_is_prerelease["$name"]="$is_pre"
+              fi
+              continue
+            fi
+
+            # if current is stable and new is prerelease: ignore (stable wins)
+            true
+          done
+
+          # build markdown table
+          tmp_table="$(mktemp)"
+          {
+            echo "| Chart | Version&nbsp;(Stable) | Description |"
+            echo "|:------|:-----------------|:------------|"
+          } > "$tmp_table"
+
+          if [ ${#best_ver[@]} -eq 0 ]; then
+            echo "| *(none)* |  |  |  |" >> "$tmp_table"
+          else
+            # sort chart names
+            mapfile -t names < <(printf "%s\n" "${!best_ver[@]}" | sort)
+
+            for name in "${names[@]}"; do
+              pkg="${best_pkg[$name]}"
+              version="${best_ver[$name]}"
+              desc="${best_desc[$name]}"
+              src="${best_src[$name]}"
+
+              # Minimal markdown escaping
+              desc="${desc//|/\\|}"
+
+              pkg_base="$(basename "$pkg")"
+              chart_cell="[\`${name}\`]($src)"
+
+              printf "| %s | \`%s\` | %s | %s |\n" \
+                "$chart_cell" \
+                "$version" \
+                "$desc" \
+                >> "$tmp_table"
+            done
+          fi
+
+          # replace marker block
+          awk -v start="$START" -v end="$END" -v tablefile="$tmp_table" '
+            BEGIN {inblock=0}
+            $0==start {print; while((getline line < tablefile) > 0) print line; close(tablefile); inblock=1; next}
+            $0==end {inblock=0; print; next}
+            inblock==0 {print}
+          ' "$README" > "${README}.tmp"
+          mv "${README}.tmp" "$README"
+
+          rm -f "$tmp_table"
+
+      ## Commit/Push changes
+      - name: Commit and push changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add README.md
+
+          if git diff --cached --quiet; then
+            echo "No changes detected. Skipping."
+            exit 0
+          fi
+
+          git commit -m "docs: updated chart table"
+          git push

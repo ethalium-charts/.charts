@@ -1,0 +1,84 @@
+## Defines the name of the workflow
+##
+name: "[OCI] publish packages"
+
+## Defines when the workflow should be started
+##
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "packages/**"
+
+## Defines the permissions of the workflow
+##
+permissions:
+  contents: write
+
+## Concurrency settings
+##
+concurrency:
+  group: publish-oci-${{ github.repository }}
+  cancel-in-progress: true
+
+## Jobs
+##
+jobs:
+  publish-oci:
+    runs-on: ubuntu-latest
+    env:
+      REPO_URL: "oci://ghcr.io/ethalium-charts/charts"
+      REPO_PACKAGES: "packages"
+    steps:
+
+      ## Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      ## Install helm
+      - name: Install helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.4
+
+      ## Login to GHRC for OCI pushes
+      - name: Login to GHCR (OCI)
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "${{ secrets.GHCR_TOKEN || github.token }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      ## Push only changed packages to OCI
+      - name: "Push changed packages only"
+        shell: bash
+        run: |
+          set -euo pipefail
+          BEFORE="${{ github.event.before }}"
+          AFTER="${{ github.sha }}"
+
+          # fallback if "before" is empty/0000. (initial push)
+          if [ -z "${BEFORE}" ] || [[ "${BEFORE}" =~ ^0+$ ]]; then
+            echo "No valid 'before' SHA. Pushing all packages in ${REPO_PACKAGES}/"
+            files=$(ls -1 "${REPO_PACKAGES}"/*.tgz 2>/dev/null || true)
+          else
+            echo "Detect changes *.tgz between ${BEFORE} and ${AFTER}"
+            files=$(git diff --name-only "${BEFORE}" "${AFTER}" -- "${REPO_PACKAGES}/" | grep -E '\.tgz$' || true)
+          fi
+
+          if [ -z "${files}" ]; then
+            echo "No .tgz changes detected."
+            exit 0
+          fi
+
+          echo "I will push these packages to OCI now:"
+          echo "${files}"
+
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            echo "== OCI push: $f"
+            if ! helm push "$f" "${REPO_URL}"; then
+              echo "WARN: push failed for $f (already exists or other issue). Continuing."
+            fi
+          done <<< "${files}"

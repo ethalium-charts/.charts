@@ -1,0 +1,88 @@
+## Defines the name of the workflow
+##
+name: "[HTTP] publish packages"
+
+## Defines when the workflow should be started
+##
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/http-publish-packages.yml"
+      - "packages/**"
+
+## Defines the permissions of the workflow
+##
+permissions:
+  contents: write
+
+## Concurrency settings
+##
+concurrency:
+  group: publish-index-${{ github.repository }}
+  cancel-in-progress: true
+
+## Jobs
+##
+jobs:
+  publish-index:
+    runs-on: ubuntu-latest
+    env:
+      REPO_URL: "http://charts.ethalium.eu"
+      REPO_PACKAGES: "packages"
+    steps:
+
+      ## Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      ## Install helm
+      - name: Install helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.4
+
+      ## Configure git identity
+      - name: Configure git identity for charts repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name  "EthaliumCharts Bot"
+          git config user.email "ethalium-charts-bot@users.noreply.github.com"
+
+      ## Generate index.yaml
+      - name: Generate index.yaml
+        shell: bash
+        run: |
+          set -euo pipefail
+          INDEX="index.yaml"
+          rm -f $INDEX
+
+          for chart_dir in "$REPO_PACKAGES"/*/; do
+            [ -d "$chart_dir" ] || continue
+            chart_name=$(basename "$chart_dir")
+            if [ ! -f "$INDEX" ]; then
+              helm repo index "${chart_dir}" --url "${REPO_URL}/${REPO_PACKAGES}/${chart_name}"
+            else
+              helm repo index "${chart_dir}" --url "${REPO_URL}/${REPO_PACKAGES}/${chart_name}" --merge "${INDEX}"
+            fi
+            rm -f $INDEX
+            cp "${chart_dir}/index.yaml" "${INDEX}" 
+          done
+
+      ## Commit/Push changes
+      - name: Commit and push changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add index.yaml
+
+          if git diff --cached --quiet; then
+            echo "No changes detected. Skipping."
+            exit 0
+          fi
+
+          git commit -m "chore(helm): updated helm repository index"
+          git push
