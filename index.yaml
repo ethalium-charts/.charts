@@ -1,0 +1,47 @@
+apiVersion: v1
+entries:
+  common:
+  - apiVersion: v2
+    appVersion: 1.0.0
+    created: "2026-01-19T02:29:24.098208322Z"
+    description: Shared functions/templates for helm charts
+    digest: 44565f7987b2e1c64f7c1bf987793e160359d633c4d081d7f7c62f02b7fcf9ff
+    keywords:
+    - common
+    - helper
+    - template
+    - function
+    - ethalium
+    maintainers:
+    - name: marxlnfcs
+      url: https://github.com/marxlnfcs
+    name: common
+    sources:
+    - https://github.com/ethalium-charts/common
+    type: library
+    urls:
+    - http://charts.ethalium.eu/packages/common/common-1.0.0.tgz
+    version: 1.0.0
+  test:
+  - apiVersion: v2
+    appVersion: 1.0.0
+    created: "2026-01-19T02:29:24.134907283Z"
+    description: Shared functions/templates for helm charts
+    digest: 2bebf1c1eaa0a26d43fdd9eaf6456a11531d9f728ffe15d9e0a00ff86f62c955
+    keywords:
+    - common
+    - helper
+    - template
+    - function
+    - ethalium
+    maintainers:
+    - name: marxlnfcs
+      url: https://github.com/marxlnfcs
+    name: test
+    sources:
+    - https://github.com/ethalium-charts/test
+    type: library
+    urls:
+    - http://charts.ethalium.eu/packages/test/test-1.0.0.tgz
+    version: 1.0.0
+generated: "2026-01-19T02:29:24.134553393Z"
