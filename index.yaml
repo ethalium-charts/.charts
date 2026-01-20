@@ -3,9 +3,9 @@ entries:
   common:
   - apiVersion: v2
     appVersion: 1.0.0
-    created: "2026-01-20T16:57:09.21784355Z"
+    created: "2026-01-20T17:08:23.525412346Z"
     description: Shared functions/templates for helm charts
-    digest: 532acd55118b99b6c3b2a100b807c19f373ef41c58aad983307fbee102f0bea5
+    digest: ac7639ed8f7b24625a66a8a8e5139367f4e4daa87347f567f0871f6a3ae7a284
     keywords:
     - common
     - helper
@@ -22,4 +22,4 @@ entries:
     urls:
     - http://charts.ethalium.eu/packages/common/common-1.0.0.tgz
     version: 1.0.0
-generated: "2026-01-20T16:57:09.217393079Z"
+generated: "2026-01-20T17:08:23.525071176Z"
